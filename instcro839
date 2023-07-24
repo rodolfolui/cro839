@@ -1,0 +1,119 @@
+#!/usr/bin/bash
+
+echo "Configurando parametros de RHEL"
+grep '^panacesuser' /etc/security/limits.conf || sed -i.bak 's/\# End of file/root            soft    nproc   10240 \
+root            hard    nproc   10240 \
+root            soft    nofile  20480 \
+root            hard    nofile  20480 \
+panacesuser     soft    nproc   10240 \
+panacesuser     hard    nproc   10240 \
+panacesuser     soft    nofile  20480 \
+panacesuser     hard    nofile  20480 \
+\
+&/' /etc/security/limits.conf
+touch /etc/sysctl.conf
+
+echo "Definiendo propiedades de instalacion"
+sed -i.bak 's/LOCAL_HOST_SERVER.*/LOCAL_HOST_SERVER=crort/
+s/DATABASE_PASSWORD.*/DATABASE_PASSWORD=Passw0rd/
+s/USER_SPECIFIC_TOMCAT_HOME.*/USER_SPECIFIC_TOMCAT_HOME=0/
+s/TOMCAT_HOME.*/TOMCAT_HOME=\/opt\/apache-tomcat-9.0.54/
+s/FQDN_SELECTION.*/FQDN_SELECTION=1/
+s/ON_DEMAND_PASSWORD.*/ON_DEMAND_PASSWORD=No/
+s/LICENSE_ACCEPTED.*/LICENSE_ACCEPTED=TRUE/
+s/SUPPORT_USER_PASSWORD.*/SUPPORT_USER_PASSWORD=Orchestration123./
+s/SANOVI_USER_PASSWORD.*/SANOVI_USER_PASSWORD=Orchestration123./
+s/MODIFY_SYSTEM_FILES.*/MODIFY_SYSTEM_FILES=1/' /install/PanacesServerInstaller.properties
+
+echo "Configurando clave de mariadb a Passw0rd"
+cp /install/my.cnf /etc/my.cnf
+mkdir -p /opt/panaces/installconfig/mariadbencryption && cd /opt/panaces/installconfig && tar xvzf /install/mariadbencryption.tar.gz
+systemctl enable mariadb
+systemctl start mariadb
+echo "SHOW VARIABLES LIKE 'have_ssl';" | mysql -u root -p | awk '/have_ssl/ { print $2 }' | grep DISABLED
+mysqladmin -f -u root password 'Passw0rd'
+#mysqladmin -u root -p shutdown
+systemctl restart mariadb
+
+echo "Instalando Resilency Orchestrator"
+/install/install.bin -f /install/PanacesServerInstaller.properties || exit 1
+
+echo "Pasos post instalación - tomcat"
+export TOMCAT_HOME=/opt/apache-tomcat-9.0.54
+[ -d $TOMCAT_HOME ] || exit 2
+sed -i.bak 's/JAVA_HOME.*/& \
+JAVA_OPTS="$JAVA_OPTS -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true "/' $TOMCAT_HOME/bin/setenv.sh
+
+[ -f /opt/panaces/installconfig/Update_Default_Tomcat_Files ] && cp /opt/panaces/installconfig/Update_Default_Tomcat_Files/* $TOMCAT_HOME/webapps/ROOT
+sed -i.bak '$d' $TOMCAT_HOME/conf/web.xml && cat <<! >> $TOMCAT_HOME/conf/web.xml
+    <error-page>
+        <error-code>404</error-code>
+        <location>/index.jsp</location>
+    </error-page>
+    <error-page>
+        <error-code>400</error-code>
+        <location>/index.jsp</location>
+    </error-page>
+    <error-page>
+        <error-code>500</error-code>
+        <location>/index.jsp</location>
+    </error-page>
+
+</web-app>
+!
+sed -i.bak 's/SHUTDOWN/Orchestration123./
+s/<\/Host>/<\/Host>\
+      <Valve className="org.apache.catalina.valves.ErrorReportValve" showReport="false" showServerInfo="false"\/>/' $TOMCAT_HOME/conf/server.xml
+sed -i.bak 's/<must-be-changed>/Orchestration123./' $TOMCAT_HOME/conf/tomcat-users.xml
+
+sed -i.bak 's/<url-pattern\>\/app\/\*\<\/url-pattern\>/&\
+\<security-constraint\>\
+\<web-resource-collection\>\
+\<web-resource-name\>Entire Application\<\/web-resource-name\>\
+\<url-pattern\>\/\*\<\/url-pattern\>\
+\<\/web-resource-collection\>\
+\<user-data-constraint\>\
+\<transport-guarantee\>CONFIDENTIAL\<\/transport-guarantee\>\
+\<\/user-data-constraint\>\
+\<\/security-constraint\>/' $TOMCAT_HOME/webapps/PanacesGUI/WEB-INF/web.xml
+
+echo "Pasos post instalación -panaces "
+wget -q https://sourceforge.net/projects/gnu-utils/files/binaries/ThirdPartyJSLib.zip -O /tmp/ThirdPartyJSLib.zip && unzip -qjd $TOMCAT_HOME/webapps/PanacesGUI/scripts/ /tmp/ThirdPartyJSLib.zip
+[ -f $TOMCAT_HOME/webapps/PanacesGUI/WEB-INF/lib/PanacesGUI.jar ] && cp $TOMCAT_HOME/webapps/PanacesGUI/WEB-INF/lib/PanacesGUI.jar $TOMCAT_HOME/webapps/PanacesGUI/WEB-INF/lib/PanacesGUI.jar.bak
+
+echo "Pasos post instalación - reportes birt"
+unzip -qd /install /install/birt-runtime-4_3_2.zip && mv /install/birt-runtime-4_3_2/WebViewerExample $TOMCAT_HOME/webapps/birt \
+    && cd $TOMCAT_HOME/webapps && cp -r PanacesGUI/report/ birt && cp PanacesGUI/WEB-INF/lib/mariadb-java-client-2.3.0.jar birt/report \
+    && chown -R tomcatuser:tomcatusergroup birt
+
+sed -i.bak 's/JAVA_OPTS="$JAVA_OPTS $JSSE_OPTS"/& -Djavax.xml.transform.TransformerFactory=com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl"/' $TOMCAT_HOME/bin/catalina.sh
+
+cd /opt/panaces/bin
+./SecurityUserInjection.sh
+
+cat > start <<!
+echo "Preparando variables de ambiente"
+export EAMSROOT=/opt/panaces
+export RMI_SERVER_IP=crort
+
+echo "Iniciando mariadb"
+#systemctl status mariadb || systemctl start mariadb
+/usr/sbin/mysqld --user=root --silent-startup &
+
+echo "Iniciando RO"
+cd /opt/panaces/bin
+./panaces start
+./panaces status
+tail -f \$EAMSROOT/var/log/console.log
+!
+
+cat > stop <<!
+echo "Preparando variables de ambiente"
+export EAMSROOT=/opt/panaces
+export RMI_SERVER_IP=crort
+
+echo "Deteniendo RO"
+cd /opt/panaces/bin
+./panaces stop
+!
+chmod 775 start stop

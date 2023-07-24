@@ -1,0 +1,39 @@
+# Copiar los medios de instalación
+[ -d cro839 ] || mkdir -p cro839
+[ -f cro839/Server.tar.gz ] || cp /mnt/c/DownloadDirector/CRO839/Server.tar.gz cro839
+[ -f cro839/Validation_Key ] || cp /mnt/c/DownloadDirector/CRO839/Validation_Key cro839
+[ -f cro839/gnulib.zip ] || wget -O cro839/gnulib.zip https://sourceforge.net/projects/gnu-utils/files/binaries/gnulib.zip/download 
+[ -f cro839/ThirdPartyJSLib.zip ] || wget -O cro839/ThirdPartyJSLib.zip https://sourceforge.net/projects/gnu-utils/files/binaries/ThirdPartyJSLib.zip/download
+[ -f cro839/birt-runtime-4.8.0-20180626.zip ] || wget -O cro839/birt-runtime-4.8.0-20180626.zip https://archive.eclipse.org/birt/downloads/drops/R-R1-4.8.0-201806261756/birt-runtime-4.8.0-20180626.zip
+[ -f cro839/my.cnf ] || cp my.cnf cro839
+[ -f cro839/mariadbencryption.tar.gz ] || cp mariadbencryption.tar.gz cro839
+
+# Crear volumen para albergar los medios de instalacion
+podman volume create cro839
+
+# Subir una instancia de ubuntu y copiar los instaladores
+podman run --rm --name base1 --volume cro839:/install registry.access.redhat.com/ubi8/ubi bash -c "tail -f /dev/null" &
+sleep 5
+podman cp cro839/Server.tar.gz base1:/install/
+podman cp cro839/Validation_Key base1:/install/
+podman cp cro839/gnulib.zip base1:/install/
+podman cp cro839/ThirdPartyJSLib.zip base1:/install/
+podman cp cro839/birt-runtime-4.8.0-20180626.zip base1:/install/
+podman cp cro839/my.cnf base1:/install/
+podman cp cro839/mariadbencryption.tar.gz base1:/install/
+podman exec -i -t base1 /bin/bash -c "cd /install/ ; [ -f install.bin ] || tar xvzf Server.tar.gz; rm Server.tar.gz" && podman stop base1 && podman rm base1
+
+# Preparar los prerequisitos de CRO
+setsebool -P container_manage_cgroup true
+podman build -f Dockerfile.cro839 --tag localhost/cro:839
+podman run --rm -v cro839:/install -p 8080:8080 -p 8443:8443 -p 3306:3306 --name crort localhost/cro:839 &
+echo "Initializing ..."
+sleep 2
+
+# Crear imagen runtime
+podman exec -it crort /bin/bash -c "/instcro839" && podman commit crort cro:839
+
+# Ejecutar posteriormente
+#podman commit crort cro:8.3.9
+#podman run --rm -it -v cro839:/install -p 8306:8306 -p 8080:8080 -p 8443:8443 --name crort localhost/cro:8.2.3 bash
+#podman run --rm -it -p 8306:8306 -p 8080:8080 -p 8443:8443 --name crort localhost/cro:8.2.3 bash

@@ -1,0 +1,54 @@
+FROM registry.access.redhat.com/ubi9/ubi
+# CRO839 image for OpenShift.
+#
+# Volumes:
+#  * /install - Installation media on build step
+
+ENV HOME=/var/lib/mysql \
+    SUMMARY="MariaDB 10.5.19 Tomcat 9.0.72 Panaces 8.3.9" \
+    DESCRIPTION="Resilency Orchestration 8.3.9"
+
+LABEL summary="$SUMMARY" \
+      description="$DESCRIPTION" \
+      io.k8s.description="$DESCRIPTION" \
+      io.k8s.display-name="CRO 8.3.9" \
+      io.openshift.expose-services="3306:mysql,8080:tomcat" \
+      io.openshift.tags="database,mysql,mariadb,mariadb105,mariadb-105" \
+      com.redhat.component="mariadb-105-container" \
+      name="cro823" \
+      version="1" \
+      usage="docker run -it -e DISPLAY=$DISPLAY --network host -v /tmp/.X11-unix:/tmp/.X11-unix -p 8080:8080 -p 3306:3306 -h crort --name crort cro839 bash" \
+      maintainer="Kyndryl Colombia <rvasquez@kyndryl.com>"
+
+# Installation of dependencies
+RUN yum --disableplugin=subscription-manager install -y yum-utils && \
+    INSTALL_PKGS="hostname libXtst net-tools bind-utils iputils iproute lsof perl-DBI libaio libsepol lsof openssl procps-ng rsync sudo unzip wget" && \
+    yum --disableplugin=subscription-manager install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
+    rpm -V $INSTALL_PKGS && \
+    yum clean all
+
+# Volume with installation software
+VOLUME ["/install"]
+
+# Installation of Tomcat 9.0.54
+RUN wget -qO- https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.54/bin/apache-tomcat-9.0.54.tar.gz | tar -xzf - -C /opt 
+
+# Installation of MariaDB 10.5.19
+RUN wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-shared-10.5.19-1.el8.x86_64.rpm
+RUN wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-common-10.5.19-1.el8.x86_64.rpm
+RUN wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-server-10.5.19-1.el8.x86_64.rpm
+RUN wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-client-10.5.19-1.el8.x86_64.rpm
+RUN wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/galera-4-26.4.7-1.el8.x86_64.rpm
+RUN wget https://vault.centos.org/centos/8/AppStream/x86_64/os/Packages/boost-program-options-1.66.0-10.el8.x86_64.rpm
+RUN yum localinstall -y boost* galera-4* MariaDB-* && rm *.rpm
+
+# Installation script CRO 8.3.9
+COPY instcro839 /
+RUN echo "SELINUX=permissive" > /etc/selinux/config
+
+# MariaDB port and Tomcat port
+EXPOSE 3306/tcp
+EXPOSE 8080/tcp
+EXPOSE 8443/tcp
+
+CMD ["/sbin/init"]
