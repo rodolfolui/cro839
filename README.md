@@ -34,12 +34,12 @@ Prepare a Virtual Machine with RHEL 8.x/9.x (Linux Red Hat Enterprise) or Ubuntu
     3. Download Tomcat 9.0.54 and install on /opt
        [root@crort /]# wget -qO- https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.54/bin/apache-tomcat-9.0.54.tar.gz | tar -xzf - -C /opt
        
-    4. Download MariaDB 10.5.9 installation rpm's
-       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.9/yum/rhel8-amd64/rpms/MariaDB-shared-10.5.9-1.el8.x86_64.rpm
-       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.9/yum/rhel8-amd64/rpms/MariaDB-common-10.5.9-1.el8.x86_64.rpm
-       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.9/yum/rhel8-amd64/rpms/MariaDB-server-10.5.9-1.el8.x86_64.rpm
-       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.9/yum/rhel8-amd64/rpms/MariaDB-client-10.5.9-1.el8.x86_64.rpm
-       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.9/yum/rhel8-amd64/rpms/galera-4-26.4.7-1.el8.x86_64.rpm
+    4. Download MariaDB 10.5.19 installation rpm's
+       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-shared-10.5.19-1.el8.x86_64.rpm
+       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-common-10.5.19-1.el8.x86_64.rpm
+       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-server-10.5.19-1.el8.x86_64.rpm
+       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/MariaDB-client-10.5.19-1.el8.x86_64.rpm
+       [root@crort /]# wget https://downloads.mariadb.com/MariaDB/mariadb-10.5.19/yum/rhel8-amd64/rpms/galera-4-26.4.7-1.el8.x86_64.rpm
 
     5. Download socat and boost-program-options (required for galera clustering)
        [root@crort /]# wget http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/socat-1.7.4.1-1.el8.x86_64.rpm
@@ -95,7 +95,7 @@ There are 4 scripts to execute previous steps in a quick way on a RHEL system wi
 
 - comandos839        Installation shell script (requires a local folder named 839 to copy installers)
 - Dockerfile.cro839  Dockerfile to build RO 8.3.9 images
-- Dockerfile.mariadb Dockerfile to build MariaDB 10.5.9 image
+- Dockerfile.mariadb Dockerfile to build MariaDB 10.5.19 image
 - instcro            RO installation script
 
        [root@crort /]# ./comandos839
