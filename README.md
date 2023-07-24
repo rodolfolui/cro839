@@ -79,14 +79,14 @@ Prepare a Virtual Machine with RHEL 8.x/9.x (Linux Red Hat Enterprise) or Ubuntu
        ./panaces restart
        
     2. On other linux shell (Outside container), save running container image to persist installation (containers are not persistent by nature)
-       $ docker commit crort cro:8.3.3
+       $ docker commit crort cro:8.3.9
     
 And that's up! already have a base image of RO we can use for training or test
     $ docker images
 
 REPOSITORY                           TAG             IMAGE ID      CREATED        SIZE
 
-localhost/cro                        8.3.3         3d5162fe511f  19 hours ago   3.98 GB
+localhost/cro                        8.3.9         3d5162fe511f  19 hours ago   3.98 GB
 
 
 ### Execution of automated scripts
